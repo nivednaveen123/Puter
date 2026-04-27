@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Opus — Claude 4.7</title>
+  <script src="https://js.puter.com/v2/"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0a0f;
+      --surface:  #111118;
+      --border:   #1e1e2e;
+      --accent:   #c8a97e;
+      --accent2:  #7e9ec8;
+      --text:     #e8e4dc;
+      --muted:    #5a5870;
+      --user-bg:  #161620;
+      --ai-bg:    #0f0f18;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      overflow: hidden;
+    }
+
+    /* Ambient background grain */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 20% 10%, rgba(200,169,126,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 90%, rgba(126,158,200,0.05) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #app {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 780px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      padding: 28px 32px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 28px;
+      font-weight: 300;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+
+    .model-tag {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 2px;
+    }
+
+    .status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #4caf7d;
+      box-shadow: 0 0 8px #4caf7d88;
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Messages */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      scroll-behavior: smooth;
+    }
+
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-track { background: transparent; }
+    #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .message {
+      display: flex;
+      gap: 16px;
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border);
+      animation: fadeSlide 0.3s ease forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .message:last-child { border-bottom: none; }
+
+    .msg-role {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      width: 52px;
+      flex-shrink: 0;
+      padding-top: 3px;
+      text-align: right;
+    }
+
+    .message.user .msg-role { color: var(--accent); }
+    .message.assistant .msg-role { color: var(--accent2); }
+
+    .msg-content {
+      flex: 1;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px;
+      font-weight: 300;
+      line-height: 1.75;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .message.user .msg-content {
+      font-style: italic;
+      color: #ccc8c0;
+    }
+
+    /* Typing cursor */
+    .typing-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: var(--accent2);
+      margin-left: 2px;
+      vertical-align: text-bottom;
+      animation: blink 0.8s step-end infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* Welcome */
+    #welcome {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 16px;
+      padding: 40px;
+    }
+
+    #welcome h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 42px;
+      font-weight: 300;
+      color: var(--accent);
+      letter-spacing: 0.04em;
+    }
+
+    #welcome p {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      max-width: 320px;
+      line-height: 1.8;
+    }
+
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 16px;
+    }
+
+    .suggestion {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      padding: 8px 14px;
+      cursor: pointer;
+      border-radius: 2px;
+      letter-spacing: 0.06em;
+      transition: all 0.2s;
+    }
+
+    .suggestion:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(200,169,126,0.05);
+    }
+
+    /* Input area */
+    footer {
+      flex-shrink: 0;
+      padding: 20px 32px 28px;
+      border-top: 1px solid var(--border);
+    }
+
+    .input-wrap {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 14px 16px;
+      transition: border-color 0.2s;
+    }
+
+    .input-wrap:focus-within {
+      border-color: var(--accent);
+    }
+
+    #input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px;
+      font-weight: 300;
+      line-height: 1.6;
+      resize: none;
+      max-height: 160px;
+      min-height: 28px;
+    }
+
+    #input::placeholder {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    #send-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      width: 34px;
+      height: 34px;
+      border-radius: 2px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    #send-btn:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(200,169,126,0.08);
+    }
+
+    #send-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    #send-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .footer-meta {
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .hint {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+    }
+
+    #clear-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      padding: 0;
+      transition: color 0.2s;
+    }
+
+    #clear-btn:hover { color: var(--accent); }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      header { padding: 20px 20px 16px; }
+      #messages { padding: 16px 20px; }
+      footer { padding: 16px 20px 24px; }
+      .logo { font-size: 22px; }
+      .msg-content { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <span class="logo">Opus</span>
+    <span class="model-tag">claude-opus-4-7</span>
+    <div class="status">
+      <div class="status-dot"></div>
+      <span>puter.js</span>
+    </div>
+  </header>
+
+  <div id="messages">
+    <div id="welcome">
+      <h2>What shall we explore?</h2>
+      <p>Powered by Claude Opus 4.7 via Puter.js — no API key required.</p>
+      <div class="suggestions">
+        <button class="suggestion" onclick="useSuggestion(this)">Explain quantum entanglement</button>
+        <button class="suggestion" onclick="useSuggestion(this)">Write a short story</button>
+        <button class="suggestion" onclick="useSuggestion(this)">Debug my thinking</button>
+        <button class="suggestion" onclick="useSuggestion(this)">Best practices in 2026</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="input-wrap">
+      <textarea
+        id="input"
+        placeholder="Ask anything…"
+        rows="1"
+        autofocus
+      ></textarea>
+      <button id="send-btn" onclick="sendMessage()" title="Send">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 8H2M8 2l6 6-6 6"/>
+        </svg>
+      </button>
+    </div>
+    <div class="footer-meta">
+      <span class="hint">Enter to send &nbsp;·&nbsp; Shift+Enter for new line</span>
+      <button id="clear-btn" onclick="clearChat()">clear chat</button>
+    </div>
+  </footer>
+</div>
+
+<script>
+  const messagesEl = document.getElementById('messages');
+  const inputEl    = document.getElementById('input');
+  const sendBtn    = document.getElementById('send-btn');
+  const welcomeEl  = document.getElementById('welcome');
+
+  let history = [];
+  let isStreaming = false;
+
+  // Auto-resize textarea
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+  });
+
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!isStreaming) sendMessage();
+    }
+  });
+
+  function useSuggestion(btn) {
+    inputEl.value = btn.textContent;
+    inputEl.dispatchEvent(new Event('input'));
+    sendMessage();
+  }
+
+  function appendMessage(role, content = '') {
+    if (welcomeEl) welcomeEl.remove();
+
+    const msg = document.createElement('div');
+    msg.className = `message ${role}`;
+    msg.innerHTML = `
+      <div class="msg-role">${role === 'user' ? 'you' : 'opus'}</div>
+      <div class="msg-content">${content}</div>
+    `;
+    messagesEl.appendChild(msg);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return msg.querySelector('.msg-content');
+  }
+
+  async function sendMessage() {
+    const text = inputEl.value.trim();
+    if (!text || isStreaming) return;
+
+    isStreaming = true;
+    sendBtn.disabled = true;
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+
+    // Add user message
+    appendMessage('user', escapeHtml(text));
+    history.push({ role: 'user', content: text });
+
+    // Prepare AI message container
+    const aiContent = appendMessage('assistant');
+    const cursor = document.createElement('span');
+    cursor.className = 'typing-cursor';
+    aiContent.appendChild(cursor);
+
+    let fullText = '';
+
+    try {
+      const resp = await puter.ai.chat(
+        history,
+        { model: 'claude-opus-4-7', stream: true }
+      );
+
+      for await (const part of resp) {
+        if (part?.text) {
+          fullText += part.text;
+          aiContent.innerHTML = formatText(fullText);
+          aiContent.appendChild(cursor);
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+      }
+
+      cursor.remove();
+      history.push({ role: 'assistant', content: fullText });
+
+    } catch (err) {
+      cursor.remove();
+      aiContent.innerHTML = `<span style="color:#c87e7e">Error: ${escapeHtml(err.message || 'Something went wrong.')}</span>`;
+    }
+
+    isStreaming = false;
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+
+  function clearChat() {
+    history = [];
+    messagesEl.innerHTML = `
+      <div id="welcome">
+        <h2>What shall we explore?</h2>
+        <p>Powered by Claude Opus 4.7 via Puter.js — no API key required.</p>
+        <div class="suggestions">
+          <button class="suggestion" onclick="useSuggestion(this)">Explain quantum entanglement</button>
+          <button class="suggestion" onclick="useSuggestion(this)">Write a short story</button>
+          <button class="suggestion" onclick="useSuggestion(this)">Debug my thinking</button>
+          <button class="suggestion" onclick="useSuggestion(this)">Best practices in 2026</button>
+        </div>
+      </div>`;
+  }
+
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function formatText(text) {
+    return escapeHtml(text)
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>')
+      .replace(/`([^`]+)`/g, '<code style="font-family:DM Mono,monospace;font-size:0.8em;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:2px;">$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  }
+</script>
+
+</body>
+</html>
